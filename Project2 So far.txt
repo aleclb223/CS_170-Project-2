@@ -52,11 +52,9 @@ def nearestneighbor(data, current_set, feature_to_add_at_this_level):
 #####################
 # Forward Selection #
 #####################
-
 def forward_selection(data):
   # Initialize an empty set
   current_set_of_features = []
-  
 
   # Initialize best accuracy to 0
   best_so_far_accuracy = 0
@@ -82,21 +80,15 @@ def forward_selection(data):
           best_accuracy = accuracy
           feature_to_add_at_this_level = k
         
-
-    # Check if adding the feature improves accuracy
-    # no bueno move inside of k loop and then find a way to copy the list to a best choice list
-    if best_accuracy > best_so_far_accuracy:
-      # Update current set of features and best accuracy
-      current_set_of_features.append(feature_to_add_at_this_level)
-      best_features=copy.copy(current_set_of_features)
-      best_so_far_accuracy = best_accuracy
-      
-
-      print(f'On level {k} added feature {feature_to_add_at_this_level} to current set')
-    else:
-      # No improvement in accuracy, exit loop
-      break
-
+        # Check if adding the feature improves accuracy
+        # no bueno move inside of k loop and then find a way to copy the list to a best choice list
+        if best_accuracy > best_so_far_accuracy:
+          # Update current set of features and best accuracy
+          best_so_far_accuracy = best_accuracy
+          current_set_of_features.append(feature_to_add_at_this_level)
+    best_features.append(current_set_of_features) # Should save the best features but IT AINT
+    print(f'On level {k} added feature {feature_to_add_at_this_level} to current set')
+     
   # Return final set of features and best accuracy
   return best_features, best_so_far_accuracy
 
@@ -148,7 +140,7 @@ def backward_elimination(data):
 def main():
 
   # UI
-  c=int(input("Which algorithm? 1 for Forward Selection, 2 for Backward Elimination, 3 for Standard Feature Search \n"))
+  c=int(input("Which algorithm? 1 for Forward Selection, 2 for Backward Elimination \n"))
 
   if c==1:
     # Perform Forward Selection
@@ -163,13 +155,6 @@ def main():
     # Perform cross-validation
     accuracy = backward_elimination(data)
     print('Accuracy:', accuracy)
-
-  elif c==3:
-    # Perform feature search
-    feature_search_demo(data)
-    # Perform cross-validation
-    accuracy = nearestneighbor(data, current_set, feature_to_add)
-    print('Accuracy: {:.2f}%'.format(accuracy*100))
     
 main()
   
