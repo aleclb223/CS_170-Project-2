@@ -1,0 +1,172 @@
+# Project 2
+
+# Reference: https://github.com/ader003/cs170-FSwNN/blob/master/featSelecwNN.py
+# Implementing: nearest neighbor
+# Calculate euclidiean dist
+import math
+import numpy as np
+import copy
+# Use Pandas for reading txt files
+import pandas as pd
+import time
+# For nearest neighbor
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import load_iris
+
+import GPUtil 
+GPUtil.getAvailable()
+import torch 
+use_cuda = torch.cuda. is_available()
+from numba import jit, cuda,numba
+import logging;
+logging.disable(logging.WARNING)
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+
+warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
+warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
+
+ 
+
+
+####################
+# Cross-Validation #
+####################
+@jit
+def nearestneighbor(data, current_set_of_features, j, algo):
+    test_features=list(current_set_of_features)
+    if(algo==1): # Forward
+        test_features.append(j)
+    if(algo==2): # Elimination
+        test_features.remove(j)
+    number_correctly_classfied = 0
+    
+    result=0
+    for i in data:
+        # Object to classify
+        short_man=math.inf # Shortest distance for that variable at that level
+
+        for k in data:
+          if not np.array_equal(k, i):
+                distance =0
+                for l in test_features:
+                    distance += pow((i[l] - k[l]), 2.0)
+                 
+                if math.sqrt(distance) < short_man:
+                    short_man = math.sqrt(distance)
+                    
+                    result =k[0]
+
+        if result == i[0]:
+            number_correctly_classfied = 1 +number_correctly_classfied
+
+    accuracy = number_correctly_classfied / data.shape[0]
+    
+    return accuracy
+
+#####################
+# Forward Selection #
+#####################
+def forwardSelection(data):
+  current_set_of_features = []   # Current feature list is empty
+  best_accuracy = 0
+  current_best_features = []    # Highest accuracy set of features
+  count_time = time.time()
+  for i in range(1,len(data[0])):  # Traverse through number of features
+    
+    print ("On Level " + str(i) + " of the search tree:")
+    feature_to_add_on_this_level = 0 # Feature with best accuracy in the level
+    best_accuracy_so_far = 0 
+             # Level accuracy
+    for j in range(1,len(data[i])):
+      if j not in current_set_of_features:
+
+        accuracy = nearestneighbor(data,current_set_of_features,j,1)
+        if not current_set_of_features:
+          print ("---Using feature(s) {" + str(j) + "} accuracy is " + str(round(accuracy*100, 2)) + "%")
+        else:
+         print( "---Using feature(s) {" + str(j) + ", " + "".join(str(current_set_of_features)) + "} accuracy is " + str(round(accuracy*100, 2)) + "%")
+
+        if(accuracy > best_accuracy_so_far):
+          best_accuracy_so_far = accuracy
+          feature_to_add_on_this_level = j
+
+    if(best_accuracy_so_far > best_accuracy):
+      best_accuracy = best_accuracy_so_far
+      current_best_features.append(feature_to_add_on_this_level)
+    else:
+      print ("\n(Warning, Accuracy has decreased! Continuing search in case of local maxima)")
+
+      current_set_of_features.append(feature_to_add_on_this_level)
+      print ("Feature set " + "".join(str(current_set_of_features)) + " was best with an accuracy of " + str(round(best_accuracy_so_far*100, 2)) + "%\n")
+  stop_time=time.time()
+  
+  print ("Best feature(s): " + "".join(str(current_best_features)) + ", with an accuracy of " + str(round(best_accuracy*100, 2)) + "%", "\nTime: ", round(stop_time - count_time, 2), " seconds")
+  
+
+########################
+# Backward Elimination #
+########################
+@jit
+def backwardElimination(data):
+  # Initialize current set of features as all features
+  current_set_of_features = [i for i in range(1, len(data[0]))]
+  current_best_features = []
+  # Initialize best accuracy to 0
+  best_so_far_accuracy = 0
+  count_time=time.time()
+  for i in range(1, data.shape[0]-1):
+    feature_to_remove_at_this_level = 0
+    best_accuracy = 0
+    # Create a new set of features by removing k
+    # new_set_of_features = current_set_of_features[:]
+    # new_set_of_features.remove(k)
+
+    for k in range(1, data.shape[0]-1):
+      # Iterate over features
+      if k in current_set_of_features:
+        print(f'---Using feature(s) {k}')
+        accuracy = nearestneighbor(data, current_set_of_features, k, 2)
+
+        # Update best accuracy and feature to remove
+        if accuracy > best_accuracy:
+          best_accuracy = accuracy
+          feature_to_remove_at_this_level = k
+
+    # Check if removing the feature improves accuracy
+    if feature_to_remove_at_this_level in current_set_of_features:
+      # Update current set of features
+      current_set_of_features.remove(feature_to_remove_at_this_level)
+      print( "---Feature(s) {" + str(k) + ", " + "".join(str(current_set_of_features)) + "} removed.")
+      print ("Feature set " + "".join(str(current_set_of_features)) + " was best with an accuracy of " + str(round(best_accuracy*100, 2)) + "%\n")
+
+    if best_accuracy >= best_so_far_accuracy:
+      best_so_far_accuracy = best_accuracy
+      current_best_features = list(current_set_of_features)
+
+  # Return final set of features and best accuracy
+  stop_time=time.time()
+  print ("Best feature(s): " + "".join(str(current_best_features)) + ", with an accuracy of " + str(round(best_so_far_accuracy*100, 2)) + "%", "\nTime: ", round(stop_time - count_time, 2), " seconds")
+  return
+      
+##########
+# Driver #
+##########
+def main():
+  # Load data
+  data = np.loadtxt('/home/foocypher/cs170/CS_170-Project-2/CS170_Small_Data__6.txt')
+  file = input("Type file name: ")
+  data =np.loadtxt(file)
+  # UI
+  c=int(input("Which algorithm? 1 for Forward Selection, 2 for Backward Elimination \n"))
+
+  if c==1:
+    # Perform Forward Selection
+    accuracy = forwardSelection(data)
+  elif c==2:
+    # Perform Backward Elimination
+    backwardElimination(data)
+    
+main()
